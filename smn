@@ -1,0 +1,125 @@
+--可能会存留部分bug自己用AI修复
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+
+WindUI:Popup({
+    Title = "小栗帽之力",
+    Icon = "sparkles",
+    Content = "竞马本身就是比拼速度的赛事，人类对速度有一种本能的追求，追求速度这是人类发展史的重要组成部分，从赛跑到赛马，从F1到超音速，又或是赛博朋克系列数据穿梭的竞速主义，都反应了人类对速度的追求和渴望",
+    Buttons = {
+        {
+            Title = "进入",
+            Icon = "arrow-right",
+            Variant = "Primary",
+            Callback = createMainWindow
+        }
+    }
+})
+
+local hookSupported = pcall(hookmetamethod) and pcall(getnamecallmethod)
+local staminaHookEnabled = false
+local oldindex, oldnewindex, oldnamecall
+local FVelocity = Vector3.new(100, 0, 0)
+local VMSetting = 1.5                      
+local ECSetting = true                      
+local ISSetting = true                      
+
+local function enableStaminaHook(enable)
+    if not hookSupported then return end
+    if enable and not staminaHookEnabled then
+        oldindex = hookmetamethod(game, "__index", function(v1, v2)
+            if ECSetting and v2 == "Velocity" and getnamecallmethod() == "ToOrientation" then
+                return FVelocity
+            end
+            return oldindex(v1, v2)
+        end)
+
+        oldnewindex = hookmetamethod(game, "__newindex", function(v1, v2, v3)
+            if v2 == "AssemblyLinearVelocity" then
+                if math.abs((v3 * VMSetting).Magnitude) < 700 then
+                    return oldnewindex(v1, v2, v3 * VMSetting)
+                end
+                return oldnewindex(v1, v2, FVelocity)
+            end
+            return oldnewindex(v1, v2, v3)
+        end)
+
+        oldnamecall = hookmetamethod(game, "__namecall", function(v1, v2, ...)
+            if ISSetting and getnamecallmethod() == "FireServer" and v2 == "SpeedTarget" then
+                return oldnamecall(v1, v2, 0)
+            end
+            return oldnamecall(v1, v2, ...)
+        end)
+
+        staminaHookEnabled = true
+    elseif not enable and staminaHookEnabled then
+        if oldindex then hookmetamethod(game, "__index", oldindex) end
+        if oldnewindex then hookmetamethod(game, "__newindex", oldnewindex) end
+        if oldnamecall then hookmetamethod(game, "__namecall", oldnamecall) end
+        staminaHookEnabled = false
+    end
+end
+
+function createMainWindow()
+    local Window = WindUI:CreateWindow({
+        Title = "閃光の芦毛怪物<font color='#00FF00'>1.0</font>",
+        Icon = "rbxassetid://81191459366283",
+        IconTransparency = 0.5,
+        IconThemed = true,
+        Author = "小栗帽",
+        Folder = "CloudHub",
+        Size = UDim2.fromOffset(400, 300),
+        Transparent = true,
+        Theme = "Light",
+        SideBarWidth = 200,
+        ScrollBarEnabled = true,
+        Background = "rbxassetid://126538227069337"
+    })
+
+    local TimeTag = Window:Tag({
+        Title = "00:00",
+        Color = Color3.fromHex("#30ff6a")
+    })
+
+    local hue = 0
+    task.spawn(function()
+        while Window do
+            local now = os.date("*t")
+            local hours = string.format("%02d", now.hour)
+            local minutes = string.format("%02d", now.min)
+            hue = (hue + 0.01) % 1
+            TimeTag:SetTitle(hours .. ":" .. minutes)
+            TimeTag:SetColor(Color3.fromHSV(hue, 1, 1))
+            task.wait(0.06)
+        end
+    end)
+
+    Window:Tag({ Title = "v1.1", Color = Color3.fromHex("#30ff6a") })
+
+    local MainTab = Window:Tab({ Title = "功能", Icon = "zap", Locked = false })
+
+    MainTab:Slider({
+        Title = "移速",
+        Value = { Min = 16, Max = 400, Default = 16 },
+        Increment = 1,
+        Callback = function(value)
+            local humanoid = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then humanoid.WalkSpeed = value end
+        end
+    })
+
+    MainTab:Slider({
+        Title = "重力",
+        Value = { Min = 0.1, Max = 500, Default = 196.2 },
+        Increment = 0.1,
+        Callback = function(value) game.Workspace.Gravity = value end
+    })
+
+    if hookSupported then
+        MainTab:Toggle({
+            Title = "无限体力",
+            Desc = "启用无限体力",
+            Default = false,
+            Callback = enableStaminaHook
+        })
+    end
+end
