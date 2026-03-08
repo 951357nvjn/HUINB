@@ -1,31 +1,50 @@
---可能会存留部分bug自己用AI修复
+--By长夜月脚本自制版
+--仅保留高级速度控制功能
+
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+
+local function getExecutorName()
+    if type(getexecutor) == "function" and getexecutor() then 
+        return getexecutor()
+    elseif type(identifyexecutor) == "function" and identifyexecutor() then 
+        return identifyexecutor()
+    else
+        return "未知 (未找到识别函数)"
+    end
+end
+
+-- 检测 hook 函数支持
+local hookSupported = pcall(function() return hookmetamethod and getnamecallmethod end)
 
 WindUI:Popup({
     Title = "小栗帽之力",
     Icon = "sparkles",
-    Content = "竞马本身就是比拼速度的赛事，人类对速度有一种本能的追求，追求速度这是人类发展史的重要组成部分，从赛跑到赛马，从F1到超音速，又或是赛博朋克系列数据穿梭的竞速主义，都反应了人类对速度的追求和渴望",
+    Content = "高级速度控制 - 底层Hook修改",
     Buttons = {
         {
             Title = "进入",
             Icon = "arrow-right",
             Variant = "Primary",
-            Callback = createMainWindow
+            Callback = function() 
+                createMainWindow()
+            end
         }
     }
 })
 
-local hookSupported = pcall(hookmetamethod) and pcall(getnamecallmethod)
-local staminaHookEnabled = false
-local oldindex, oldnewindex, oldnamecall
-local FVelocity = Vector3.new(100, 0, 0)
-local VMSetting = 1.5                      
-local ECSetting = true                      
-local ISSetting = true                      
+-- 高级速度控制相关变量
+local speedHooksEnabled = false
+local FVelocity = Vector3.new(100, 0, 0)   -- 目标速度向量
+local VMSetting = 1.5                      -- 速度倍率
+local ECSetting = true                      -- 是否应用 __index 条件
+local ISSetting = true                      -- 是否应用 __namecall 条件
 
-local function enableStaminaHook(enable)
+local oldindex, oldnewindex, oldnamecall   -- 保存原 hook 函数
+
+local function enableSpeedHooks(enable)
     if not hookSupported then return end
-    if enable and not staminaHookEnabled then
+
+    if enable and not speedHooksEnabled then
         oldindex = hookmetamethod(game, "__index", function(v1, v2)
             if ECSetting and v2 == "Velocity" and getnamecallmethod() == "ToOrientation" then
                 return FVelocity
@@ -50,76 +69,158 @@ local function enableStaminaHook(enable)
             return oldnamecall(v1, v2, ...)
         end)
 
-        staminaHookEnabled = true
-    elseif not enable and staminaHookEnabled then
-        if oldindex then hookmetamethod(game, "__index", oldindex) end
-        if oldnewindex then hookmetamethod(game, "__newindex", oldnewindex) end
-        if oldnamecall then hookmetamethod(game, "__namecall", oldnamecall) end
-        staminaHookEnabled = false
+        speedHooksEnabled = true
+    elseif not enable and speedHooksEnabled then
+        if oldindex then
+            hookmetamethod(game, "__index", oldindex)
+            oldindex = nil
+        end
+        if oldnewindex then
+            hookmetamethod(game, "__newindex", oldnewindex)
+            oldnewindex = nil
+        end
+        if oldnamecall then
+            hookmetamethod(game, "__namecall", oldnamecall)
+            oldnamecall = nil
+        end
+        speedHooksEnabled = false
     end
 end
 
 function createMainWindow()
     local Window = WindUI:CreateWindow({
         Title = "閃光の芦毛怪物<font color='#00FF00'>1.0</font>",
-        Icon = "rbxassetid://81191459366283",
+        Icon = "zap",
         IconTransparency = 0.5,
-        IconThemed = true,
         Author = "小栗帽",
         Folder = "CloudHub",
         Size = UDim2.fromOffset(400, 300),
-        Transparent = true,
         Theme = "Light",
         SideBarWidth = 200,
         ScrollBarEnabled = true,
-        Background = "rbxassetid://126538227069337"
     })
-
+    
     local TimeTag = Window:Tag({
         Title = "00:00",
         Color = Color3.fromHex("#30ff6a")
     })
-
+    
     local hue = 0
     task.spawn(function()
-        while Window do
+        while true do
             local now = os.date("*t")
             local hours = string.format("%02d", now.hour)
             local minutes = string.format("%02d", now.min)
+            
             hue = (hue + 0.01) % 1
+            local color = Color3.fromHSV(hue, 1, 1)
+            
             TimeTag:SetTitle(hours .. ":" .. minutes)
-            TimeTag:SetColor(Color3.fromHSV(hue, 1, 1))
+            TimeTag:SetColor(color) 
             task.wait(0.06)
         end
     end)
-
-    Window:Tag({ Title = "v1.1", Color = Color3.fromHex("#30ff6a") })
-
-    local MainTab = Window:Tab({ Title = "功能", Icon = "zap", Locked = false })
-
-    MainTab:Slider({
-        Title = "移速",
-        Value = { Min = 16, Max = 400, Default = 16 },
-        Increment = 1,
-        Callback = function(value)
-            local humanoid = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then humanoid.WalkSpeed = value end
-        end
+    
+    Window:Tag({
+        Title = "v1.1",
+        Color = Color3.fromHex("#30ff6a")
     })
 
-    MainTab:Slider({
-        Title = "重力",
-        Value = { Min = 0.1, Max = 500, Default = 196.2 },
-        Increment = 0.1,
-        Callback = function(value) game.Workspace.Gravity = value end
+    Window:EditOpenButton({
+        Title = "小栗帽之力",
+        Icon = "crown",
+        CornerRadius = UDim.new(0,16),
+        StrokeThickness = 3, 
+        Color = ColorSequence.new(Color3.fromHex("FF0F7B"), Color3.fromHex("F89B29")),
+        Draggable = true, 
+        StrokeColor = ColorSequence.new({ 
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),     
+            ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 165, 0)), 
+            ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255, 255, 0)), 
+            ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0, 255, 0)),   
+            ColorSequenceKeypoint.new(0.8, Color3.fromRGB(0, 0, 255)),   
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(128, 0, 128))    
+        }),
     })
-
+    
+    local MainTab = Window:Tab({
+        Title = "主页",
+        Icon = "home",
+    })
+    
+    MainTab:Paragraph({
+        Title = "《閃光の芦毛怪物》",
+        Desc = "高级速度控制 - 底层Hook",
+        Image = "zap",
+        ImageSize = 42,
+    })
+    
+    MainTab:Paragraph({
+        Title = "注入器",
+        Desc = ": " .. getExecutorName(), 
+    })
+    
+    local SpeedTab = Window:Tab({
+        Title = "体力控制",
+        Icon = "zap",
+    })
+    
     if hookSupported then
-        MainTab:Toggle({
-            Title = "无限体力",
-            Desc = "启用无限体力",
+        SpeedTab:Toggle({
+            Title = "无限体力其他的那些不用管",
+            Desc = "超绝无限体力",
             Default = false,
-            Callback = enableStaminaHook
+            Callback = function(val)
+                enableSpeedHooks(val)
+            end
+        })
+
+        SpeedTab:Input({
+            Title = "目标速度向量 (FVelocity)",
+            Desc = "格式: x,y,z  例: 100,0,0",
+            Value = "100,0,0",
+            Callback = function(input)
+                local x, y, z = input:match("([%d.-]+),([%d.-]+),([%d.-]+)")
+                if x and y and z then
+                    FVelocity = Vector3.new(tonumber(x) or 100, tonumber(y) or 0, tonumber(z) or 0)
+                end
+            end
+        })
+
+        SpeedTab:Slider({
+            Title = "速度倍率",
+            Value = {
+                Min = 0.1,
+                Max = 10,
+                Default = 1.5,
+            },
+            Increment = 0.1,
+            Callback = function(val)
+                VMSetting = val
+            end
+        })
+
+        SpeedTab:Toggle({
+            Title = "应用 __index 条件",
+            Default = true,
+            Callback = function(val)
+                ECSetting = val
+            end
+        })
+
+        SpeedTab:Toggle({
+            Title = "应用 __namecall 条件",
+            Default = true,
+            Callback = function(val)
+                ISSetting = val
+            end
+        })
+    else
+        SpeedTab:Paragraph({
+            Title = "原神牛逼",
+            Desc = "原神牛逼",
+            Image = "alert-triangle",
+            ImageSize = 24
         })
     end
 end
